@@ -1,0 +1,108 @@
+# ============================================================
+# .NET / C#
+# ============================================================
+
+# Build output
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio
+.vs/
+*.rsuser
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Rider / ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Publish output
+publish/
+**/publish/
+
+# Entity Framework migrations snapshots de build
+# (mantemos os arquivos de migration, apenas ignoramos gerados)
+*.db-shm
+*.db-wal
+
+# ============================================================
+# Banco de dados local (SQLite)
+# ============================================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================================
+# Segredos e configurações sensíveis
+# ============================================================
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+*.pfx
+*.p12
+secrets.json
+
+# ============================================================
+# Ferramentas de IA
+# ============================================================
+
+# Anthropic Claude
+.claude/
+CLAUDE.md
+
+# Antigravity / Google AI
+.agents/
+
+# Graphify (knowledge graph gerado automaticamente)
+graphify-out/
+
+# Cursor AI
+.cursor/
+.cursorignore
+
+# GitHub Copilot
+.github/copilot-instructions.md
+
+# ============================================================
+# Sistema Operacional
+# ============================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ============================================================
+# Logs e temporários
+# ============================================================
+*.log
+*.tmp
+*.temp
+logs/

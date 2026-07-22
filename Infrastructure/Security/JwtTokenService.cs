@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using CheckInApp.Application.UseCases.Identidade;
+using CheckInApp.Application.UseCases.Identity;
 
 namespace CheckInApp.Infrastructure.Security;
 

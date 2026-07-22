@@ -10,25 +10,24 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<Quarto> Quartos { get; set; }
-    public DbSet<Reserva> Reservas { get; set; }
-    public DbSet<Usuario> Usuarios { get; set; }
+    public DbSet<Room> Rooms { get; set; }
+    public DbSet<Reservation> Reservations { get; set; }
+    public DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Quarto>().OwnsOne(q => q.HospedeAtual);
+        modelBuilder.Entity<Room>().OwnsOne(r => r.CurrentGuest);
 
-  
-        modelBuilder.Entity<Usuario>(b =>
+        modelBuilder.Entity<User>(b =>
         {
             b.Property(u => u.Email)
                 .HasConversion(
                     vo => vo.Value,
                     str => new Email(str),
                     new ValueComparer<Email>(
-                        (a, b) => a!.Value == b!.Value,  // igualdade
-                        v => v.Value.GetHashCode(),       // hash
-                        v => new Email(v.Value)))         // snapshot
+                        (a, b) => a!.Value == b!.Value,
+                        v => v.Value.GetHashCode(),
+                        v => new Email(v.Value)))
                 .HasColumnName("Email");
 
             b.Property(u => u.Cpf)
@@ -42,22 +41,22 @@ public class AppDbContext : DbContext
                 .HasColumnName("Cpf");
         });
 
-        modelBuilder.Entity<Quarto>().HasData(
-            new Quarto { Id = 1, Numero = 101, Status = StatusQuarto.Disponivel, ValorDiaria = 100.00m, CapacidadeMaxima = 2 },
-            new Quarto { Id = 2, Numero = 102, Status = StatusQuarto.Disponivel, ValorDiaria = 150.00m, CapacidadeMaxima = 3 },
-            new Quarto { Id = 3, Numero = 103, Status = StatusQuarto.Disponivel, ValorDiaria = 200.00m, CapacidadeMaxima = 4 }
+        modelBuilder.Entity<Room>().HasData(
+            new Room { Id = 1, Number = 101, Status = RoomStatus.Available, DailyRate = 100.00m, MaxCapacity = 2 },
+            new Room { Id = 2, Number = 102, Status = RoomStatus.Available, DailyRate = 150.00m, MaxCapacity = 3 },
+            new Room { Id = 3, Number = 103, Status = RoomStatus.Available, DailyRate = 200.00m, MaxCapacity = 4 }
         );
 
-        // Seed com Restaurar — dados já existentes, sem re-hashear senha
-        modelBuilder.Entity<Usuario>().HasData(
-            Usuario.Restaurar(
+        // Seed with Restore — existing data, without re-hashing password
+        modelBuilder.Entity<User>().HasData(
+            User.Restore(
                 id: 1,
-                nome: "Administrador do Sistema",
+                name: "System Administrator",
                 email: "admin@hotel.com",
                 cpf: "000.000.000-00",
-                senhaHash: BCrypt.Net.BCrypt.HashPassword("Admin@123"),
-                numeroCelular: "00000000000",
-                role: TipoUsuario.Administrador
+                passwordHash: BCrypt.Net.BCrypt.HashPassword("Admin@123"),
+                phoneNumber: "00000000000",
+                role: UserRole.Administrator
             )
         );
     }

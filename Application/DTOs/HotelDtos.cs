@@ -2,27 +2,27 @@ namespace CheckInApp.Application.DTOs;
 
 public record CheckInRequestDto(
     string Cpf,
-    string NomeHospede,
-    int NumeroQuarto,
-    DateTime Checkin,
-    int QuantidadeHospede,
-    string? Observacoes,
-    string[]? Acompanhantes
+    string GuestName,
+    int RoomNumber,
+    DateTime CheckIn,
+    int GuestCount,
+    string? Notes,
+    string[]? Companions
 );
 
 public record CheckOutRequestDto(
     string Cpf,
-    int NumeroQuarto,
-    decimal TaxasAdicionais,
-    string? Observacoes
+    int RoomNumber,
+    decimal AdditionalFees,
+    string? Notes
 );
 
 public record SignupDto(
-    string Nome,
+    string Name,
     string Email,
     string Cpf,
-    string Senha,
-    string NumeroCelular
+    string Password,
+    string PhoneNumber
 );
 
 public record LoginDto(

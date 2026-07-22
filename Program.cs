@@ -1,12 +1,12 @@
 // ============================================================
-//  COMPOSIÇÃO DA APLICAÇÃO (Composition Root)
-//  Este é o único lugar onde todas as camadas se conhecem.
-//  Domain e Application NÃO referenciam Infrastructure diretamente.
+//  APPLICATION COMPOSITION ROOT
+//  This is the only place where all layers know each other.
+//  Domain and Application do NOT reference Infrastructure directly.
 // ============================================================
 
-using CheckInApp.Application.UseCases.Hospedagem;
-using CheckInApp.Application.UseCases.Reservas;
-using CheckInApp.Application.UseCases.Identidade;
+using CheckInApp.Application.UseCases.Hospitality;
+using CheckInApp.Application.UseCases.Reservations;
+using CheckInApp.Application.UseCases.Identity;
 using CheckInApp.Infrastructure.Persistence;
 using CheckInApp.Infrastructure.Persistence.Repositories;
 using CheckInApp.Infrastructure.Security;
@@ -18,30 +18,30 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Infraestrutura de Persistência ---
+// --- Persistence Infrastructure ---
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=banco.db"));
+    options.UseSqlite("Data Source=hotel.db"));
 
-// --- Adaptadores de Saída (Driven Adapters): Interface do Domain ← Implementação da Infra ---
-builder.Services.AddScoped<IQuartoRepository, QuartoRepository>();
-builder.Services.AddScoped<IReservaRepository, ReservaRepository>();
-builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+// --- Output Adapters (Driven Adapters): Domain Interface ← Infrastructure Implementation ---
+builder.Services.AddScoped<IRoomRepository, RoomRepository>();
+builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-// --- Infraestrutura de Segurança ---
+// --- Security Infrastructure ---
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
-// --- Casos de Uso (Application Layer) ---
+// --- Use Cases (Application Layer) ---
 builder.Services.AddScoped<ICheckInUseCase, CheckInUseCase>();
 builder.Services.AddScoped<ICheckOutUseCase, CheckOutUseCase>();
-builder.Services.AddScoped<IListarReservasUseCase, ListarReservasUseCase>();
-builder.Services.AddScoped<IListarReservaCpfUseCase, ListarReservaCpfUseCase>();
+builder.Services.AddScoped<IListReservationsUseCase, ListReservationsUseCase>();
+builder.Services.AddScoped<IListReservationByCpfUseCase, ListReservationByCpfUseCase>();
 builder.Services.AddScoped<ILoginUseCase, LoginUseCase>();
 builder.Services.AddScoped<ISignupUseCase, SignupUseCase>();
 
-// --- Adaptadores de Entrada (Driving Adapters): Controllers ---
+// --- Input Adapters (Driving Adapters): Controllers ---
 builder.Services.AddControllers();
 
-// --- Autenticação JWT ---
+// --- JWT Authentication ---
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -49,6 +49,11 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    // Disable automatic claim type remapping so ClaimTypes.Role
+    // is preserved exactly as written in the token, allowing
+    // [Authorize(Roles = "...")] to match correctly.
+    options.MapInboundClaims = false;
+
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -58,14 +63,16 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+        // Tell the framework which claim holds the role value
+        RoleClaimType = System.Security.Claims.ClaimTypes.Role
     };
 });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    // Define o esquema de segurança JWT no Swagger
+    // JWT security scheme for Swagger
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -73,10 +80,10 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Cole o token JWT aqui. Exemplo: eyJhbGci..."
+        Description = "Paste the JWT token here. Example: eyJhbGci..."
     });
 
-    // Aplica o esquema JWT em todos os endpoints automaticamente
+    // Apply JWT scheme to all endpoints automatically
     options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
