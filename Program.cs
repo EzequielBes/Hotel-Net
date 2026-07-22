@@ -68,6 +68,19 @@ builder.Services.AddMassTransit(x =>
         {
             e.ConfigureConsumer<ProcessBookingConsumer>(context);
 
+            // IMPORTANT: this partitioner is a correctness requirement, not just a
+            // throughput optimization. BookingOrderRepository.TryAssignRoom wraps its
+            // free-room lookup + assignment + SaveChanges in a Serializable transaction,
+            // but Sqlite does not provide true multi-connection Serializable snapshot
+            // isolation the way a server RDBMS does — under real concurrent contention
+            // across connections it can throw locking/SQLITE_BUSY errors instead of
+            // cleanly serializing two overlapping transactions. Double-booking is only
+            // actually prevented here because keying by RoomCategoryId guarantees that
+            // two TryAssignRoom calls for the same category never execute concurrently
+            // in the first place. Do not remove this partitioner or raise per-partition
+            // concurrency above 1 without first replacing TryAssignRoom's concurrency
+            // control with something that is safe across real concurrent Sqlite
+            // connections (e.g. a unique constraint-based assignment or a different DB).
             var partitioner = e.CreatePartitioner(8);
             e.UsePartitioner<ProcessBookingMessage>(partitioner, m => new Guid(m.Message.RoomCategoryId, 0, 0, new byte[8]));
         });
@@ -137,6 +150,32 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// --- Global Exception Handling ---
+// No custom exception types exist in this codebase yet: use cases throw bare
+// System.Exception with a descriptive message (e.g. "Room category not found",
+// "Booking order not found", "Guest count exceeds category capacity"). Without
+// custom exception types we can't cleanly distinguish "not found" from
+// "validation failed" by type, so this uses a pragmatic heuristic: any message
+// containing "not found" maps to 404, everything else maps to 400. This is a
+// stopgap that keeps unhandled domain exceptions from surfacing as raw 500s
+// across all controllers (Booking, Hospitality, Auth) without requiring a
+// larger refactor into typed exceptions.
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var message = exceptionFeature?.Error.Message ?? "An unexpected error occurred";
+
+        context.Response.StatusCode = message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+            ? StatusCodes.Status404NotFound
+            : StatusCodes.Status400BadRequest;
+        context.Response.ContentType = "application/json";
+
+        await context.Response.WriteAsJsonAsync(new { error = message });
+    });
+});
 
 if (app.Environment.IsDevelopment())
 {
