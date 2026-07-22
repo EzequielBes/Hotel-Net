@@ -13,8 +13,8 @@ public class MassTransitBookingMessagePublisher : IBookingMessagePublisher
         _publishEndpoint = publishEndpoint;
     }
 
-    public void PublishProcessBooking(int bookingOrderId)
+    public void PublishProcessBooking(int bookingOrderId, int roomCategoryId)
     {
-        _publishEndpoint.Publish(new ProcessBookingMessage(bookingOrderId)).GetAwaiter().GetResult();
+        _publishEndpoint.Publish(new ProcessBookingMessage(bookingOrderId, roomCategoryId)).GetAwaiter().GetResult();
     }
 }

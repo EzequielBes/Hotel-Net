@@ -85,8 +85,8 @@ CheckInApp.Tests/Application/UseCases/Booking/
 - `IRatePlanRepository { RatePlan[] ListByCategory(int roomCategoryId); RatePlan? GetById(int id); }`
 - `IBookingOrderRepository { BookingOrder? GetByIdempotencyKey(string key); BookingOrder AddBookingOrder(BookingOrder order); BookingOrder? GetById(int id); void UpdateBookingOrder(BookingOrder order); Room? TryAssignRoom(BookingOrder order); }`
 - `IWebhookSender { void SendBookingResult(BookingOrder order); }`
-- `IBookingMessagePublisher { void PublishProcessBooking(int bookingOrderId); }`
-- `ProcessBookingMessage(int BookingOrderId)` — MassTransit message record
+- `IBookingMessagePublisher { void PublishProcessBooking(int bookingOrderId, int roomCategoryId); }`
+- `ProcessBookingMessage(int BookingOrderId, int RoomCategoryId)` — MassTransit message record
 - `ICreateBookingUseCase { BookingOrder Execute(CreateBookingCommand command); }`
 - `CreateBookingCommand(string IdempotencyKey, string Cpf, string GuestName, int GuestCount, int RoomCategoryId, int RatePlanId, DateTime CheckInDate, DateTime CheckOutDate)`
 - `IListAvailableRoomsUseCase { AvailableRoomCategoryDto[] Execute(ListAvailableRoomsQuery query); }`
@@ -308,7 +308,7 @@ namespace CheckInApp.Domain.Ports;
 
 public interface IBookingMessagePublisher
 {
-    void PublishProcessBooking(int bookingOrderId);
+    void PublishProcessBooking(int bookingOrderId, int roomCategoryId);
 }
 ```
 
@@ -642,7 +642,7 @@ public class CreateBookingUseCaseTests
 
         result.Status.Should().Be(BookingStatus.Pending);
         result.Id.Should().Be(42);
-        _publisherMock.Verify(p => p.PublishProcessBooking(42), Times.Once);
+        _publisherMock.Verify(p => p.PublishProcessBooking(42, 1), Times.Once);
     }
 
     [Fact]
@@ -655,7 +655,7 @@ public class CreateBookingUseCaseTests
 
         result.Should().BeSameAs(existing);
         _bookingOrderRepositoryMock.Verify(r => r.AddBookingOrder(It.IsAny<BookingOrder>()), Times.Never);
-        _publisherMock.Verify(p => p.PublishProcessBooking(It.IsAny<int>()), Times.Never);
+        _publisherMock.Verify(p => p.PublishProcessBooking(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
     [Fact]
@@ -804,7 +804,7 @@ public class CreateBookingUseCase : ICreateBookingUseCase
         };
 
         order = _bookingOrderRepository.AddBookingOrder(order);
-        _publisher.PublishProcessBooking(order.Id);
+        _publisher.PublishProcessBooking(order.Id, order.RoomCategoryId);
 
         return order;
     }
@@ -1119,7 +1119,7 @@ git commit -m "feat: add GetBookingUseCase for booking status lookup"
 
 **Interfaces:**
 - Consumes: `IBookingOrderRepository`, `IWebhookSender` (Task 2/3); `BookingOrder`, `BookingStatus`, `Room` (Task 1).
-- Produces: `IProcessBookingUseCase.Execute(int bookingOrderId)`, called from `ProcessBookingConsumer.Consume(...)` (Task 8). `ProcessBookingMessage(int BookingOrderId)` is the MassTransit message contract published by `MassTransitBookingMessagePublisher` (Task 8) and consumed by `ProcessBookingConsumer` (Task 8).
+- Produces: `IProcessBookingUseCase.Execute(int bookingOrderId)`, called from `ProcessBookingConsumer.Consume(...)` (Task 8). `ProcessBookingMessage(int BookingOrderId, int RoomCategoryId)` is the MassTransit message contract published by `MassTransitBookingMessagePublisher` (Task 8) and consumed by `ProcessBookingConsumer` (Task 8). `RoomCategoryId` is carried on the message solely so the receive endpoint can partition by category (Task 10); the use case still re-fetches the order from the DB and does not need the field itself.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -1226,7 +1226,7 @@ Expected: FAIL — compile error, types don't exist yet.
 ```csharp
 namespace CheckInApp.Application.UseCases.Booking;
 
-public record ProcessBookingMessage(int BookingOrderId);
+public record ProcessBookingMessage(int BookingOrderId, int RoomCategoryId);
 ```
 
 - [ ] **Step 4: Create `IProcessBookingUseCase.cs`**
@@ -1367,9 +1367,9 @@ public class MassTransitBookingMessagePublisher : IBookingMessagePublisher
         _publishEndpoint = publishEndpoint;
     }
 
-    public void PublishProcessBooking(int bookingOrderId)
+    public void PublishProcessBooking(int bookingOrderId, int roomCategoryId)
     {
-        _publishEndpoint.Publish(new ProcessBookingMessage(bookingOrderId)).GetAwaiter().GetResult();
+        _publishEndpoint.Publish(new ProcessBookingMessage(bookingOrderId, roomCategoryId)).GetAwaiter().GetResult();
     }
 }
 ```
@@ -1628,9 +1628,10 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("process-booking", e =>
         {
-            e.ConcurrentMessageLimit = 1;
             e.ConfigureConsumer<ProcessBookingConsumer>(context);
-            e.UsePartitioner<ProcessBookingMessage>(1, m => m.Message.BookingOrderId.ToString());
+
+            var partitioner = e.CreatePartitioner(8);
+            e.UsePartitioner<ProcessBookingMessage>(partitioner, m => new Guid(m.Message.RoomCategoryId, 0, 0, new byte[8]));
         });
     });
 });
@@ -1729,4 +1730,4 @@ Expected: Container stopped and removed.
 
 - **Spec coverage:** availability listing (Task 5/9), rate-plan/category model (Task 1/3), min/max stay + capacity validation (Task 4), same-room-never-double-booked consistency (Task 3 `TryAssignRoom` + Task 8 partitioned consumer), queue (Task 8/10 MassTransit+RabbitMQ), webhook (Task 8 `HttpWebhookSender`), idempotency (Task 1 unique index + Task 4 `GetByIdempotencyKey` check) — all covered.
 - **Placeholder scan:** no TBD/TODO; the webhook URL in `appsettings.json` is a literal placeholder value the user must replace with a real endpoint before Task 11 Step 8 will show a successful POST — this is called out explicitly, not left implicit.
-- **Type consistency:** `BookingOrder`, `RoomCategory`, `RatePlan`, `BookingStatus` property names are identical across Tasks 1, 3, 4, 5, 6, 7. `ProcessBookingMessage(int BookingOrderId)` matches between Task 7 (definition) and Task 8 (consumer/publisher usage).
+- **Type consistency:** `BookingOrder`, `RoomCategory`, `RatePlan`, `BookingStatus` property names are identical across Tasks 1, 3, 4, 5, 6, 7. `ProcessBookingMessage(int BookingOrderId, int RoomCategoryId)` matches between Task 7 (definition) and Task 8 (consumer/publisher usage); `RoomCategoryId` is also the partition key used in Task 10's `ReceiveEndpoint` config.

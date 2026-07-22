@@ -61,7 +61,7 @@ public class CreateBookingUseCaseTests
 
         result.Status.Should().Be(BookingStatus.Pending);
         result.Id.Should().Be(42);
-        _publisherMock.Verify(p => p.PublishProcessBooking(42), Times.Once);
+        _publisherMock.Verify(p => p.PublishProcessBooking(42, 1), Times.Once);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class CreateBookingUseCaseTests
 
         result.Should().BeSameAs(existing);
         _bookingOrderRepositoryMock.Verify(r => r.AddBookingOrder(It.IsAny<BookingOrder>()), Times.Never);
-        _publisherMock.Verify(p => p.PublishProcessBooking(It.IsAny<int>()), Times.Never);
+        _publisherMock.Verify(p => p.PublishProcessBooking(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
     [Fact]

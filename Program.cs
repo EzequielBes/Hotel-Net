@@ -66,11 +66,10 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("process-booking", e =>
         {
-            e.ConcurrentMessageLimit = 1;
             e.ConfigureConsumer<ProcessBookingConsumer>(context);
 
-            var partitioner = e.CreatePartitioner(1);
-            e.UsePartitioner<ProcessBookingMessage>(partitioner, m => new Guid(m.Message.BookingOrderId, 0, 0, new byte[8]));
+            var partitioner = e.CreatePartitioner(8);
+            e.UsePartitioner<ProcessBookingMessage>(partitioner, m => new Guid(m.Message.RoomCategoryId, 0, 0, new byte[8]));
         });
     });
 });

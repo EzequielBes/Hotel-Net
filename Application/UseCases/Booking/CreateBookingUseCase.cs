@@ -59,7 +59,7 @@ public class CreateBookingUseCase : ICreateBookingUseCase
         };
 
         order = _bookingOrderRepository.AddBookingOrder(order);
-        _publisher.PublishProcessBooking(order.Id);
+        _publisher.PublishProcessBooking(order.Id, order.RoomCategoryId);
 
         return order;
     }
