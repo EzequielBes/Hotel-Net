@@ -7,10 +7,14 @@
 using CheckInApp.Application.UseCases.Hospitality;
 using CheckInApp.Application.UseCases.Reservations;
 using CheckInApp.Application.UseCases.Identity;
+using CheckInApp.Application.UseCases.Booking;
 using CheckInApp.Infrastructure.Persistence;
 using CheckInApp.Infrastructure.Persistence.Repositories;
 using CheckInApp.Infrastructure.Security;
+using CheckInApp.Infrastructure.Messaging;
+using CheckInApp.Infrastructure.Webhooks;
 using CheckInApp.Domain.Ports;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -26,6 +30,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoomCategoryRepository, RoomCategoryRepository>();
+builder.Services.AddScoped<IRatePlanRepository, RatePlanRepository>();
+builder.Services.AddScoped<IBookingOrderRepository, BookingOrderRepository>();
+builder.Services.AddScoped<IBookingMessagePublisher, MassTransitBookingMessagePublisher>();
+builder.Services.AddHttpClient<IWebhookSender, HttpWebhookSender>();
 
 // --- Security Infrastructure ---
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
@@ -37,6 +46,34 @@ builder.Services.AddScoped<IListReservationsUseCase, ListReservationsUseCase>();
 builder.Services.AddScoped<IListReservationByCpfUseCase, ListReservationByCpfUseCase>();
 builder.Services.AddScoped<ILoginUseCase, LoginUseCase>();
 builder.Services.AddScoped<ISignupUseCase, SignupUseCase>();
+builder.Services.AddScoped<IListAvailableRoomsUseCase, ListAvailableRoomsUseCase>();
+builder.Services.AddScoped<ICreateBookingUseCase, CreateBookingUseCase>();
+builder.Services.AddScoped<IGetBookingUseCase, GetBookingUseCase>();
+builder.Services.AddScoped<IProcessBookingUseCase, ProcessBookingUseCase>();
+
+// --- Messaging Infrastructure (RabbitMQ via MassTransit) ---
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumer<ProcessBookingConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(builder.Configuration["RabbitMq:Host"], "/", h =>
+        {
+            h.Username(builder.Configuration["RabbitMq:Username"]!);
+            h.Password(builder.Configuration["RabbitMq:Password"]!);
+        });
+
+        cfg.ReceiveEndpoint("process-booking", e =>
+        {
+            e.ConcurrentMessageLimit = 1;
+            e.ConfigureConsumer<ProcessBookingConsumer>(context);
+
+            var partitioner = e.CreatePartitioner(1);
+            e.UsePartitioner<ProcessBookingMessage>(partitioner, m => new Guid(m.Message.BookingOrderId, 0, 0, new byte[8]));
+        });
+    });
+});
 
 // --- Input Adapters (Driving Adapters): Controllers ---
 builder.Services.AddControllers();
