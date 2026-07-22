@@ -66,6 +66,9 @@ secrets.json
 # Anthropic Claude
 .claude/
 CLAUDE.md
+doc_seguranca.md
+docs/superpowers/
+.superpowers/
 
 # Antigravity / Google AI
 .agents/
