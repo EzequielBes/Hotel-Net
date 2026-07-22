@@ -9,5 +9,6 @@ public class Room
     public RoomStatus Status { get; set; }
     public decimal DailyRate { get; set; }
     public int MaxCapacity { get; set; }
+    public int RoomCategoryId { get; set; }
     public Guest? CurrentGuest { get; set; }
 }
