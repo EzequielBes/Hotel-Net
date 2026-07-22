@@ -8,5 +8,5 @@ public interface IBookingOrderRepository
     BookingOrder AddBookingOrder(BookingOrder order);
     BookingOrder? GetById(int id);
     void UpdateBookingOrder(BookingOrder order);
-    Room? FindFreeRoomInCategory(int roomCategoryId, DateTime checkIn, DateTime checkOut);
+    Room? TryAssignRoom(BookingOrder order);
 }

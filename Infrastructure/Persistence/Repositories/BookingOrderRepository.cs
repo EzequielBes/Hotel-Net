@@ -38,17 +38,30 @@ public class BookingOrderRepository : IBookingOrderRepository
         _context.SaveChanges();
     }
 
-    public Room? FindFreeRoomInCategory(int roomCategoryId, DateTime checkIn, DateTime checkOut)
+    public Room? TryAssignRoom(BookingOrder order)
     {
         using var transaction = _context.Database.BeginTransaction(IsolationLevel.Serializable);
 
         var freeRoom = _context.Rooms
-            .Where(r => r.RoomCategoryId == roomCategoryId)
+            .Where(r => r.RoomCategoryId == order.RoomCategoryId)
             .FirstOrDefault(r => !_context.BookingOrders.Any(b =>
                 b.RoomId == r.Id &&
                 b.Status == BookingStatus.Confirmed &&
-                b.CheckInDate < checkOut &&
-                b.CheckOutDate > checkIn));
+                b.CheckInDate < order.CheckOutDate &&
+                b.CheckOutDate > order.CheckInDate));
+
+        if (freeRoom != null)
+        {
+            order.RoomId = freeRoom.Id;
+            order.Status = BookingStatus.Confirmed;
+        }
+        else
+        {
+            order.Status = BookingStatus.Rejected;
+        }
+
+        _context.BookingOrders.Update(order);
+        _context.SaveChanges();
 
         transaction.Commit();
         return freeRoom;
